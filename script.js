@@ -1,6 +1,5 @@
 import { pipeline, env } from 'https://jsdelivr.net';
 
-// ALLOW remote streaming from high-speed cache servers
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 
@@ -13,7 +12,7 @@ function loadSavedData() {
         const saved = localStorage.getItem('pc_ai_chats');
         if (saved) { allConversations = JSON.parse(saved); }
     } catch (e) {
-        console.error("Storage sync failure:", e);
+        console.error("Local registry sync failure:", e);
     }
     renderSidebar();
 }
@@ -28,18 +27,17 @@ async function initAI() {
     const sendBtn = document.getElementById('send-btn');
     
     try {
-        if (statusEl) statusEl.innerText = "⏳ Connecting to High-Speed AI Engine (140MB Download)...";
+        if (statusEl) statusEl.innerText = "⏳ Connecting to High-Speed AI Engine (140MB Cache Build)...";
         
-        // Streams a tiny, highly-optimized 4-bit version that loads in seconds and fits inside Chromebook RAM
         generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
             device: 'webgpu',
-            dtype: 'q4' 
+            dtype: 'q4'
         });
         
         if (statusEl) statusEl.innerText = "🟢 AI Online via WebGPU Accelerator";
         if (sendBtn) sendBtn.disabled = false; 
     } catch (err) {
-        console.warn("WebGPU fallback triggered, checking CPU pipeline...", err);
+        console.warn("WebGPU fallback triggered, checking CPU...", err);
         try {
             generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
                 dtype: 'q4'
@@ -98,7 +96,7 @@ function renderSidebar() {
         item.className = 'chat-item';
         item.dataset.id = id;
         item.innerText = allConversations[id].title;
-        item.onclick = () => window.switchChat(id);
+        item.onclick = () => switchChat(id);
         if (id === currentChatId) item.classList.add('active');
         listEl.appendChild(item);
     });
@@ -154,11 +152,8 @@ function appendMessage(text, className) {
     return id;
 }
 
-// Binds functions to the window so your layout can see them
 window.createNewChat = createNewChat;
 window.switchChat = switchChat;
 window.sendMessage = sendMessage;
 
-// Trigger execution smoothly
 initAI();
-
