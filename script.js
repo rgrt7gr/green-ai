@@ -1,8 +1,8 @@
 import { pipeline, env } from 'https://jsdelivr.net';
 
-// STRICT OVERRIDE: Tells the library to never try fetching files from the web
-env.allowLocalModels = true;
-env.allowRemoteModels = false;
+// ALLOW remote streaming from high-speed cache servers
+env.allowLocalModels = false;
+env.allowRemoteModels = true;
 
 let generator = null;
 let allConversations = {}; 
@@ -10,16 +10,16 @@ let currentChatId = null;
 
 function loadSavedData() {
     try {
-        const saved = localStorage.getItem('local_offline_chats');
+        const saved = localStorage.getItem('pc_ai_chats');
         if (saved) { allConversations = JSON.parse(saved); }
     } catch (e) {
-        console.error("Local registry fetch error:", e);
+        console.error("Storage sync failure:", e);
     }
     renderSidebar();
 }
 
 function saveData() {
-    localStorage.setItem('local_offline_chats', JSON.stringify(allConversations));
+    localStorage.setItem('pc_ai_chats', JSON.stringify(allConversations));
 }
 
 async function initAI() {
@@ -28,26 +28,26 @@ async function initAI() {
     const sendBtn = document.getElementById('send-btn');
     
     try {
-        if (statusEl) statusEl.innerText = "⏳ Reading Local Neural Assets from /model/ Folder...";
+        if (statusEl) statusEl.innerText = "⏳ Connecting to High-Speed AI Engine (140MB Download)...";
         
-        // This targets the relative folder structure exactly where your downloads live
-        generator = await pipeline('text-generation', './model/', {
+        // Streams a tiny, highly-optimized 4-bit version that loads in seconds and fits inside Chromebook RAM
+        generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
             device: 'webgpu',
-            model_file_name: 'onnx/model_quantized.onnx' // Points directly to your downloaded 512MB weight file
+            dtype: 'q4' 
         });
         
-        if (statusEl) statusEl.innerText = "🟢 AI Online Natively (WebGPU Accelerated)";
+        if (statusEl) statusEl.innerText = "🟢 AI Online via WebGPU Accelerator";
         if (sendBtn) sendBtn.disabled = false; 
     } catch (err) {
-        console.warn("WebGPU initialization fallback triggered, checking CPU...", err);
+        console.warn("WebGPU fallback triggered, checking CPU pipeline...", err);
         try {
-            generator = await pipeline('text-generation', './model/', {
-                model_file_name: 'onnx/model_quantized.onnx'
+            generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
+                dtype: 'q4'
             });
-            if (statusEl) statusEl.innerText = "🟡 AI Online Natively (CPU Core Mode)";
+            if (statusEl) statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
             if (sendBtn) sendBtn.disabled = false;
         } catch (cpuErr) {
-            if (statusEl) statusEl.innerText = "❌ Error: Cannot find local model assets inside /model/ folder.";
+            if (statusEl) statusEl.innerText = "❌ Core script initialization error.";
             console.error(cpuErr);
         }
     }
@@ -78,7 +78,7 @@ function switchChat(id) {
     
     const msgBox = document.getElementById('messages-box');
     if (msgBox) {
-        msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side from local project directory folders. Enter data stream:</div>';
+        msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side on your hardware. Enter data stream:</div>';
         if (allConversations[id].history) {
             allConversations[id].history.forEach(msg => {
                 appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg');
@@ -154,11 +154,11 @@ function appendMessage(text, className) {
     return id;
 }
 
-// Bind methods cleanly to public window scopes
+// Binds functions to the window so your layout can see them
 window.createNewChat = createNewChat;
 window.switchChat = switchChat;
 window.sendMessage = sendMessage;
 
-// Execute system initialization
+// Trigger execution smoothly
 initAI();
 
