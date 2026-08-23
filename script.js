@@ -4,11 +4,31 @@ let generator = null;
 let allConversations = {}; 
 let currentChatId = null;
 
+// Cleanly connect button functions to your HTML elements
+function setupEventListeners() {
+    const sendBtn = document.getElementById('send-btn');
+    const newChatBtn = document.querySelector('.new-chat-btn');
+    const userInput = document.getElementById('user-input');
+
+    if (sendBtn) {
+        sendBtn.addEventListener('click', sendMessage);
+    }
+    if (newChatBtn) {
+        newChatBtn.addEventListener('click', createNewChat);
+    }
+    if (userInput) {
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        });
+    }
+}
+
 function loadSavedData() {
     const saved = localStorage.getItem('pc_ai_chats');
-    if (saved) {
-        allConversations = JSON.parse(saved);
-    }
+    if (saved) { allConversations = JSON.parse(saved); }
     renderSidebar();
 }
 
@@ -18,10 +38,11 @@ function saveData() {
 
 async function initAI() {
     loadSavedData();
+    setupEventListeners();
     const statusEl = document.getElementById('status');
+    
     try {
         statusEl.innerText = "⏳ Booting Green AI Engine via WebGPU...";
-        // Utilizing the stable version string that matches your hardware acceleration engine
         generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
             device: 'webgpu'
         });
@@ -34,23 +55,18 @@ async function initAI() {
             statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
             document.getElementById('send-btn').disabled = false;
         } catch (cpuErr) {
-            statusEl.innerText = "❌ Security block or script error occurred.";
+            statusEl.innerText = "❌ Script initialization error.";
         }
     }
 
-    if (Object.keys(allConversations).length === 0) {
-        createNewChat();
-    } else {
-        switchChat(Object.keys(allConversations)[0]);
-    }
+    if (Object.keys(allConversations).length === 0) { createNewChat(); } 
+    else { switchChat(Object.keys(allConversations)[0]); }
 }
 
+// Fixed variable mismatch that was breaking new tab generations
 function createNewChat() {
     const id = 'chat_' + Date.now();
-    allConversations[id] = {
-        title: "New Stream Data",
-        history: []
-    };
+    allConversations[id] = { title: "New Stream Data", history: [] };
     saveData();
     renderSidebar();
     switchChat(id);
@@ -64,17 +80,21 @@ function switchChat(id) {
     });
     const msgBox = document.getElementById('messages-box');
     msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side on your hardware. Enter data stream:</div>';
-    const currentHistory = allConversations[id].history;
-    currentHistory.forEach(msg => {
-        appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg');
-    });
+    
+    if (allConversations[id] && allConversations[id].history) {
+        allConversations[id].history.forEach(msg => {
+            appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg');
+        });
+    }
     msgBox.scrollTop = msgBox.scrollHeight;
 }
 
 function renderSidebar() {
     const listEl = document.getElementById('chat-list-box');
+    if (!listEl) return;
     listEl.innerHTML = '';
-    Object.keys(allConversations).sort((a,b) => b.split('_') - a.split('_')).forEach(id => {
+    
+    Object.keys(allConversations).sort((a,b) => b.split('_')[1] - a.split('_')[1]).forEach(id => {
         const item = document.createElement('div');
         item.className = 'chat-item';
         item.dataset.id = id;
@@ -107,15 +127,14 @@ async function sendMessage() {
             max_new_tokens: 250, 
             temperature: 0.6
         });
-        const aiReply = output.generated_text[output.generated_text.length - 1].content;
+        const aiReply = output[0].generated_text[output[0].generated_text.length - 1].content;
         aiMessageEl.innerText = aiReply;
         allConversations[currentChatId].history.push({ role: 'assistant', content: aiReply });
         saveData();
     } catch (error) {
         aiMessageEl.innerText = "Runtime Error: " + error.message;
     }
-    const msgBox = document.getElementById('messages-box');
-    msgBox.scrollTop = msgBox.scrollHeight;
+    document.getElementById('messages-box').scrollTop = document.getElementById('messages-box').scrollHeight;
 }
 
 function appendMessage(text, className) {
@@ -126,11 +145,9 @@ function appendMessage(text, className) {
     div.className = `msg ${className}`;
     div.innerText = text;
     msgBox.appendChild(div);
-    msgBox.scrollTop = msgBox.scrollHeight;
+    if (msgBox) msgBox.scrollTop = msgBox.scrollHeight;
     return id;
 }
 
-// Attach your logic functions cleanly to the web window so the HTML buttons can call them
-window.onload = initAI;
-window.sendMessage = sendMessage;
-window.createNewChat = createNewChat;
+// Automatically trigger on script injection load
+initAI();
