@@ -14,8 +14,6 @@
             height: 100vh;
             overflow: hidden;
         }
-        
-        /* SIDEBAR STYLES */
         .sidebar {
             width: 260px;
             background: #161f18;
@@ -72,8 +70,6 @@
             border-color: #52b788;
             color: #ffffff;
         }
-
-        /* MAIN CHAT INTERFACE */
         .main-content {
             flex-grow: 1;
             display: flex;
@@ -181,10 +177,27 @@
             box-shadow: none;
         }
     </style>
-
-    <!-- Switched to official, production-ready release package -->
+</head>
+<body>
+    <div class="sidebar">
+        <div class="new-chat-btn" onclick="createNewChat()">+ New Data Stream</div>
+        <div class="history-label">Saved Cycles</div>
+        <div id="chat-list-box" class="chat-list"></div>
+    </div>
+    <div class="main-content">
+        <div id="status" class="status">Loading framework protocols...</div>
+        <div class="chat-container">
+            <div id="messages-box" class="messages">
+                <div class="msg ai-msg">System ready. Running fully client-side on your hardware. Enter data stream:</div>
+            </div>
+            <div class="input-area">
+                <textarea id="user-input" placeholder="Transmit message..." onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendMessage(); }"></textarea>
+                <button id="send-btn" class="send-btn" onclick="sendMessage()" disabled>Send</button>
+            </div>
+        </div>
+    </div>
     <script type="module">
-        import { pipeline, env } from 'https://jsdelivr.net';
+        import { pipeline } from 'https://jsdelivr.net';
 
         let generator = null;
         let allConversations = {}; 
@@ -192,9 +205,7 @@
 
         function loadSavedData() {
             const saved = localStorage.getItem('pc_ai_chats');
-            if (saved) {
-                allConversations = JSON.parse(saved);
-            }
+            if (saved) { allConversations = JSON.parse(saved); }
             renderSidebar();
         }
 
@@ -207,38 +218,27 @@
             const statusEl = document.getElementById('status');
             try {
                 statusEl.innerText = "⏳ Booting Green AI Engine via WebGPU...";
-                
-                // Using a smarter 1.5B model now since you have 32GB RAM
                 generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-1.5B-Instruct', {
                     device: 'webgpu'
                 });
-                
                 statusEl.innerText = "🟢 AI Online via PC WebGPU Hardware";
                 document.getElementById('send-btn').disabled = false;
             } catch (err) {
-                console.warn("WebGPU not responding, checking CPU runtime...", err);
                 try {
                     generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-1.5B-Instruct');
-                    statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
+                    statusEl.innerText = "🟡 AI Online (CPU Mode - Slower)";
                     document.getElementById('send-btn').disabled = false;
                 } catch (cpuErr) {
-                    statusEl.innerText = "❌ Security block or infinite script loop occurred.";
+                    statusEl.innerText = "❌ Script initialization failed.";
                 }
             }
-
-            if (Object.keys(allConversations).length === 0) {
-                createNewChat();
-            } else {
-                switchChat(Object.keys(allConversations)[0]);
-            }
+            if (Object.keys(allConversations).length === 0) { createNewChat(); } 
+            else { switchChat(Object.keys(allConversations)[0]); }
         }
 
         function createNewChat() {
             const id = 'chat_' + Date.now();
-            allConversations[id] = {
-                title: "New Stream Data",
-                history: []
-            };
+            allConversations[id] = { title: "New Stream Data", history: [] };
             saveData();
             renderSidebar();
             switchChat(id);
@@ -246,17 +246,13 @@
 
         function switchChat(id) {
             currentChatId = id;
-            
             document.querySelectorAll('.chat-item').forEach(item => {
                 item.classList.remove('active');
                 if (item.dataset.id === id) item.classList.add('active');
             });
-
             const msgBox = document.getElementById('messages-box');
-            msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side on your hardware. Enter data stream:</div>';
-            
-            const currentHistory = allConversations[id].history;
-            currentHistory.forEach(msg => {
+            msgBox.innerHTML = '<div class="msg ai-msg">System ready. Enter data stream:</div>';
+            allConversations[id].history.forEach(msg => {
                 appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg');
             });
             msgBox.scrollTop = msgBox.scrollHeight;
@@ -265,7 +261,6 @@
         function renderSidebar() {
             const listEl = document.getElementById('chat-list-box');
             listEl.innerHTML = '';
-            
             Object.keys(allConversations).sort((a,b) => b.split('_')[1] - a.split('_')[1]).forEach(id => {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
@@ -283,12 +278,11 @@
             if (!prompt || !generator || !currentChatId) return;
 
             inputEl.value = '';
-            
             appendMessage(prompt, 'user-msg');
             allConversations[currentChatId].history.push({ role: 'user', content: prompt });
 
             if (allConversations[currentChatId].title === "New Stream Data") {
-                allConversations[currentChatId].title = prompt.substring(0, 22) + (prompt.length > 22 ? '...' : '');
+                allConversations[currentChatId].title = prompt.substring(0, 20) + '...';
                 renderSidebar();
             }
 
@@ -296,3 +290,35 @@
             const aiMessageEl = document.getElementById(aiMessageId);
 
             try {
+                const output = await generator(allConversations[currentChatId].history, { 
+                    max_new_tokens: 250, 
+                    temperature: 0.6
+                });
+                const aiReply = output.generated_text[output.generated_text.length - 1].content;
+                aiMessageEl.innerText = aiReply;
+                allConversations[currentChatId].history.push({ role: 'assistant', content: aiReply });
+                saveData();
+            } catch (error) {
+                aiMessageEl.innerText = "Runtime Error: " + error.message;
+            }
+            document.getElementById('messages-box').scrollTop = document.getElementById('messages-box').scrollHeight;
+        }
+
+        function appendMessage(text, className) {
+            const msgBox = document.getElementById('messages-box');
+            const div = document.createElement('div');
+            const id = 'msg-' + Date.now();
+            div.id = id;
+            div.className = 'msg ' + className;
+            div.innerText = text;
+            msgBox.appendChild(div);
+            msgBox.scrollTop = msgBox.scrollHeight;
+            return id;
+        }
+
+        window.onload = initAI;
+        window.sendMessage = sendMessage;
+        window.createNewChat = createNewChat;
+    </script>
+</body>
+</html>
