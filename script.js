@@ -9,7 +9,7 @@ function loadSavedData() {
         const saved = localStorage.getItem('pc_ai_chats');
         if (saved) { allConversations = JSON.parse(saved); }
     } catch (e) {
-        console.error("Local storage sync error:", e);
+        console.error("Storage tracker sync error:", e);
     }
     renderSidebar();
 }
@@ -26,7 +26,6 @@ async function initAI() {
     try {
         if (statusEl) statusEl.innerText = "⏳ Booting Green AI Engine via WebGPU...";
         
-        // Connects dynamically to your native graphics card using the production runtime
         generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
             device: 'webgpu'
         });
@@ -34,7 +33,7 @@ async function initAI() {
         if (statusEl) statusEl.innerText = "🟢 AI Online via PC WebGPU Hardware";
         if (sendBtn) sendBtn.disabled = false; 
     } catch (err) {
-        console.warn("WebGPU fallback triggered, checking CPU pipeline...", err);
+        console.warn("WebGPU fallback triggered, checking CPU...", err);
         try {
             generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct');
             if (statusEl) statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
@@ -48,7 +47,7 @@ async function initAI() {
     if (Object.keys(allConversations).length === 0) { 
         createNewChat(); 
     } else { 
-        switchChat(Object.keys(allConversations)[0]); 
+        switchChat(Object.keys(allConversations)); 
     }
 }
 
@@ -91,7 +90,7 @@ function renderSidebar() {
         item.className = 'chat-item';
         item.dataset.id = id;
         item.innerText = allConversations[id].title;
-        item.onclick = () => switchChat(id);
+        item.onclick = () => window.switchChat(id);
         if (id === currentChatId) item.classList.add('active');
         listEl.appendChild(item);
     });
@@ -147,31 +146,10 @@ function appendMessage(text, className) {
     return id;
 }
 
-// Background handler maps event click pipelines automatically
-function setupEventListeners() {
-    const sendBtn = document.getElementById('send-btn');
-    const newChatBtn = document.querySelector('.new-chat-btn');
-    const userInput = document.getElementById('user-input');
+// Binds the modular code securely onto the global scope
+window.createNewChat = createNewChat;
+window.switchChat = switchChat;
+window.sendMessage = sendMessage;
 
-    if (sendBtn) sendBtn.onclick = sendMessage;
-    if (newChatBtn) newChatBtn.onclick = createNewChat;
-    if (userInput) {
-        userInput.onkeydown = (event) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault();
-                sendMessage();
-            }
-        };
-    }
-}
-
-// Safely execute initialization workflows
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        setupEventListeners();
-        initAI();
-    });
-} else {
-    setupEventListeners();
-    initAI();
-}
+// Fire up engine loading sequence
+initAI();
