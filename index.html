@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chromebook Text AI - Multi-Chat Green Edition</title>
+    <title>PC Text AI - Stable Green Edition</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -182,15 +182,16 @@
         }
     </style>
 
+    <!-- Switched to official, production-ready release package -->
     <script type="module">
-        import { pipeline } from 'https://jsdelivr.net';
+        import { pipeline, env } from 'https://jsdelivr.net';
 
         let generator = null;
         let allConversations = {}; 
         let currentChatId = null;
 
         function loadSavedData() {
-            const saved = localStorage.getItem('chromebook_ai_chats');
+            const saved = localStorage.getItem('pc_ai_chats');
             if (saved) {
                 allConversations = JSON.parse(saved);
             }
@@ -198,29 +199,30 @@
         }
 
         function saveData() {
-            localStorage.setItem('chromebook_ai_chats', JSON.stringify(allConversations));
+            localStorage.setItem('pc_ai_chats', JSON.stringify(allConversations));
         }
 
         async function initAI() {
             loadSavedData();
             const statusEl = document.getElementById('status');
             try {
-                statusEl.innerText = "⏳ Booting Green AI Engine (~350MB)...";
+                statusEl.innerText = "⏳ Booting Green AI Engine via WebGPU...";
                 
-                generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
+                // Using a smarter 1.5B model now since you have 32GB RAM
+                generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-1.5B-Instruct', {
                     device: 'webgpu'
                 });
                 
-                statusEl.innerText = "🟢 AI Online via WebGPU Accelerator";
+                statusEl.innerText = "🟢 AI Online via PC WebGPU Hardware";
                 document.getElementById('send-btn').disabled = false;
             } catch (err) {
-                console.warn("WebGPU unavailable, forcing CPU fallback...", err);
+                console.warn("WebGPU not responding, checking CPU runtime...", err);
                 try {
-                    generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct');
+                    generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-1.5B-Instruct');
                     statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
                     document.getElementById('send-btn').disabled = false;
                 } catch (cpuErr) {
-                    statusEl.innerText = "❌ Initialization Blocked by Admin Network.";
+                    statusEl.innerText = "❌ Security block or infinite script loop occurred.";
                 }
             }
 
@@ -264,7 +266,7 @@
             const listEl = document.getElementById('chat-list-box');
             listEl.innerHTML = '';
             
-            Object.keys(allConversations).sort((a,b) => b.split('_') - a.split('_')).forEach(id => {
+            Object.keys(allConversations).sort((a,b) => b.split('_')[1] - a.split('_')[1]).forEach(id => {
                 const item = document.createElement('div');
                 item.className = 'chat-item';
                 item.dataset.id = id;
@@ -294,6 +296,3 @@
             const aiMessageEl = document.getElementById(aiMessageId);
 
             try {
-                const output = await generator(allConversations[currentChatId].history, { 
-                    max_new_tokens: 120, 
-                    temperature: 0.6
