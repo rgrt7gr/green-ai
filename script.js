@@ -150,4 +150,11 @@ function appendMessage(text, className) {
 }
 
 // Automatically trigger on script injection load
-initAI();
+// Manually bind the functions directly to the global window so your HTML can access them
+window.initAI = initAI;
+window.sendMessage = sendMessage;
+window.createNewChat = createNewChat;
+window.switchChat = switchChat;
+
+// Execute initialization protocols
+window.initAI();
