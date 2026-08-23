@@ -1,4 +1,8 @@
-import { pipeline } from 'https://jsdelivr.net';
+import { pipeline, env } from 'https://jsdelivr.net';
+
+// STRICT OVERRIDE: Tells the library to never try fetching files from the web
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
 
 let generator = null;
 let allConversations = {}; 
@@ -6,16 +10,16 @@ let currentChatId = null;
 
 function loadSavedData() {
     try {
-        const saved = localStorage.getItem('pc_ai_chats');
+        const saved = localStorage.getItem('local_offline_chats');
         if (saved) { allConversations = JSON.parse(saved); }
     } catch (e) {
-        console.error("Storage sync failure:", e);
+        console.error("Local registry fetch error:", e);
     }
     renderSidebar();
 }
 
 function saveData() {
-    localStorage.setItem('pc_ai_chats', JSON.stringify(allConversations));
+    localStorage.setItem('local_offline_chats', JSON.stringify(allConversations));
 }
 
 async function initAI() {
@@ -24,23 +28,26 @@ async function initAI() {
     const sendBtn = document.getElementById('send-btn');
     
     try {
-        if (statusEl) statusEl.innerText = "⏳ Booting Green AI Engine... Downloading files (~350MB)";
+        if (statusEl) statusEl.innerText = "⏳ Reading Local Neural Assets from /model/ Folder...";
         
-        // This will automatically stream the model files directly into your browser memory cache
-        generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
-            device: 'webgpu'
+        // This targets the relative folder structure exactly where your downloads live
+        generator = await pipeline('text-generation', './model/', {
+            device: 'webgpu',
+            model_file_name: 'onnx/model_quantized.onnx' // Points directly to your downloaded 512MB weight file
         });
         
-        if (statusEl) statusEl.innerText = "🟢 AI Online via PC WebGPU Hardware";
+        if (statusEl) statusEl.innerText = "🟢 AI Online Natively (WebGPU Accelerated)";
         if (sendBtn) sendBtn.disabled = false; 
     } catch (err) {
-        console.warn("WebGPU fallback triggered, checking CPU pipeline...", err);
+        console.warn("WebGPU initialization fallback triggered, checking CPU...", err);
         try {
-            generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct');
-            if (statusEl) statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
+            generator = await pipeline('text-generation', './model/', {
+                model_file_name: 'onnx/model_quantized.onnx'
+            });
+            if (statusEl) statusEl.innerText = "🟡 AI Online Natively (CPU Core Mode)";
             if (sendBtn) sendBtn.disabled = false;
         } catch (cpuErr) {
-            if (statusEl) statusEl.innerText = "❌ Core script initialization error.";
+            if (statusEl) statusEl.innerText = "❌ Error: Cannot find local model assets inside /model/ folder.";
             console.error(cpuErr);
         }
     }
@@ -71,7 +78,7 @@ function switchChat(id) {
     
     const msgBox = document.getElementById('messages-box');
     if (msgBox) {
-        msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side on your hardware. Enter data stream:</div>';
+        msgBox.innerHTML = '<div class="msg ai-msg">System ready. Running fully client-side from local project directory folders. Enter data stream:</div>';
         if (allConversations[id].history) {
             allConversations[id].history.forEach(msg => {
                 appendMessage(msg.content, msg.role === 'user' ? 'user-msg' : 'ai-msg');
@@ -147,10 +154,11 @@ function appendMessage(text, className) {
     return id;
 }
 
-// === EXPOSE FUNCTIONS GLOBALLY SO INDEX.HTML CAN SEE THEM ===
+// Bind methods cleanly to public window scopes
 window.createNewChat = createNewChat;
 window.switchChat = switchChat;
 window.sendMessage = sendMessage;
 
-// Safely boot the engine sequence
+// Execute system initialization
 initAI();
+
