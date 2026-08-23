@@ -9,7 +9,7 @@ function loadSavedData() {
         const saved = localStorage.getItem('pc_ai_chats');
         if (saved) { allConversations = JSON.parse(saved); }
     } catch (e) {
-        console.error("Storage tracker sync error:", e);
+        console.error("Storage sync failure:", e);
     }
     renderSidebar();
 }
@@ -24,8 +24,9 @@ async function initAI() {
     const sendBtn = document.getElementById('send-btn');
     
     try {
-        if (statusEl) statusEl.innerText = "⏳ Booting Green AI Engine via WebGPU...";
+        if (statusEl) statusEl.innerText = "⏳ Booting Green AI Engine... Downloading files (~350MB)";
         
+        // This will automatically stream the model files directly into your browser memory cache
         generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct', {
             device: 'webgpu'
         });
@@ -33,7 +34,7 @@ async function initAI() {
         if (statusEl) statusEl.innerText = "🟢 AI Online via PC WebGPU Hardware";
         if (sendBtn) sendBtn.disabled = false; 
     } catch (err) {
-        console.warn("WebGPU fallback triggered, checking CPU...", err);
+        console.warn("WebGPU fallback triggered, checking CPU pipeline...", err);
         try {
             generator = await pipeline('text-generation', 'onnx-community/Qwen2.5-0.5B-Instruct');
             if (statusEl) statusEl.innerText = "🟡 AI Online (CPU Core Mode - Slower)";
@@ -146,10 +147,10 @@ function appendMessage(text, className) {
     return id;
 }
 
-// Binds the modular code securely onto the global scope
+// === EXPOSE FUNCTIONS GLOBALLY SO INDEX.HTML CAN SEE THEM ===
 window.createNewChat = createNewChat;
 window.switchChat = switchChat;
 window.sendMessage = sendMessage;
 
-// Fire up engine loading sequence
+// Safely boot the engine sequence
 initAI();
